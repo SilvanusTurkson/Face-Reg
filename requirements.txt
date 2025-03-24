@@ -1,8 +1,9 @@
 streamlit
 deepface
+opencv-python-headless
+tensorflow-cpu
 pillow
-opencv-python
-tensorflow
 numpy
 pandas
-tqdm
+gdown
+h5py
