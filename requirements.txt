@@ -1,5 +1,6 @@
-opencv-python-headless
-deepface
 streamlit
+deepface
+opencv-python-headless
 numpy
 Pillow
+tensorflow
