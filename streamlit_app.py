@@ -7,6 +7,7 @@ from PIL import Image
 st.set_page_config(page_title="Face Recognition System", layout="wide")
 st.title("🔍 Face Recognition System")
 
+
 # Function to load known faces and extract embeddings
 def load_known_faces(known_faces_dir):
     known_embeddings = {}
@@ -26,6 +27,7 @@ def load_known_faces(known_faces_dir):
                     st.warning(f"Skipped {img_path} (error: {str(e)})")
     return known_embeddings
 
+
 # Function to recognize a face
 def recognize_face(unknown_img_path, known_embeddings, threshold=0.65):
     try:
@@ -34,7 +36,7 @@ def recognize_face(unknown_img_path, known_embeddings, threshold=0.65):
             model_name="Facenet",
             enforce_detection=False
         )[0]["embedding"]
-        
+
         best_match = None
         best_score = 0
 
@@ -47,7 +49,7 @@ def recognize_face(unknown_img_path, known_embeddings, threshold=0.65):
                 enforce_detection=False
             )
             similarity = 1 - result["distance"]  # Convert to similarity score (0-1)
-            
+
             if similarity > best_score and similarity >= threshold:
                 best_score = similarity
                 best_match = name
@@ -56,6 +58,7 @@ def recognize_face(unknown_img_path, known_embeddings, threshold=0.65):
     except Exception as e:
         st.error(f"Recognition error: {str(e)}")
         return "Error", 0
+
 
 # Main Streamlit UI
 def main():
@@ -69,7 +72,7 @@ def main():
     if not os.path.exists(KNOWN_FACES_DIR):
         st.error("Error: 'dataset/known_faces' folder not found!")
         return
-    
+
     known_embeddings = load_known_faces(KNOWN_FACES_DIR)
     if not known_embeddings:
         st.error("No valid faces found in 'known_faces'. Add images in subfolders.")
@@ -81,15 +84,15 @@ def main():
     if option == "Upload Image":
         st.subheader("Upload a Face to Recognize")
         uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
-        
+
         if uploaded_file:
             img = Image.open(uploaded_file)
             st.image(img, caption="Uploaded Image", width=300)
-            
+
             # Save temp file and recognize
             temp_path = "temp_upload.jpg"
             img.save(temp_path)
-            
+
             name, score = recognize_face(temp_path, known_embeddings, threshold)
             st.write("---")
             if name != "Unknown":
@@ -100,17 +103,17 @@ def main():
     elif option == "Test Unknown Faces Folder":
         st.subheader("Testing Images from 'unknown_faces' Folder")
         UNKNOWN_FACES_DIR = "dataset/unknown_faces"
-        
+
         if not os.path.exists(UNKNOWN_FACES_DIR):
             st.error("Error: 'dataset/unknown_faces' folder not found!")
             return
-        
+
         for img_file in os.listdir(UNKNOWN_FACES_DIR):
             img_path = os.path.join(UNKNOWN_FACES_DIR, img_file)
             try:
                 img = Image.open(img_path)
                 st.image(img, caption=f"Image: {img_file}", width=200)
-                
+
                 name, score = recognize_face(img_path, known_embeddings, threshold)
                 if name != "Unknown":
                     st.success(f"✅ **Match:** {name} (Confidence: {score:.2f})")
@@ -119,6 +122,7 @@ def main():
                 st.write("---")
             except Exception as e:
                 st.error(f"Failed to process {img_file}: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
