@@ -1,8 +1,8 @@
-streamlit==1.28.0
-deepface==0.0.79
-pillow==10.1.0
-opencv-python==4.8.1.78
-tensorflow==2.13.0  # or tensorflow-cpu if you don't have GPU
-numpy==1.24.4
-pandas==2.0.3
-tqdm==4.66.1
+streamlit
+deepface
+pillow
+opencv-python
+tensorflow
+numpy
+pandas
+tqdm
