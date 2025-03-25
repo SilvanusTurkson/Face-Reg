@@ -1,5 +1,4 @@
-deepface
 streamlit
-opencv-python-headless
-keras==2.15.0
-tensorflow==2.15.0
+deepface
+tensorflow==2.12.0
+opencv-python
