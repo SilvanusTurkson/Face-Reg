@@ -1,126 +1,124 @@
-# Install Dependencies (Colab Only)
-# !pip install deepface streamlit opencv-python-headless
-
 import streamlit as st
-import os
 import pandas as pd
 import numpy as np
 from deepface import DeepFace
+import os
+from PIL import Image
+import tempfile
 
-# Configuration
+# Configuration - USING RELATIVE PATHS
 CONFIG = {
-    "known_faces_dir": "/content/drive/MyDrive/known_faces",
-    "unknown_faces_dir": "/content/drive/MyDrive/unknown_faces",
-    "database_path": "/content/drive/MyDrive/face_embeddings.csv",
-    "model_name": "ArcFace",
+    "known_faces_dir": "known_faces",  # Changed to local directory
+    "database_path": "face_embeddings.csv",
+    "model_name": "Facenet",  # Changed to Facenet (smaller model)
     "threshold": 0.55,
-    "image_extensions": ('.png', '.jpg', '.jpeg'),
-    "detector": "retinaface"
+    "detector": "opencv"  # Changed to opencv (lighter than retinaface)
 }
 
-def is_image_file(filename):
-    return filename.lower().endswith(CONFIG['image_extensions'])
+# Initialize directories
+os.makedirs(CONFIG['known_faces_dir'], exist_ok=True)
 
-def clean_directory_listing(path):
-    return [f for f in os.listdir(path) if is_image_file(f)]
 
-# Extract Embeddings
-def extract_embeddings():
-    data = []
-    st.info("⏳ Extracting face embeddings...")
+@st.cache_data
+def load_database():
+    try:
+        df = pd.read_csv(CONFIG['database_path'])
+        df['embedding'] = df['embedding'].apply(eval)
+        return df
+    except:
+        return pd.DataFrame(columns=['name', 'embedding'])
 
-    for person_name in os.listdir(CONFIG['known_faces_dir']):
-        person_path = os.path.join(CONFIG['known_faces_dir'], person_name)
 
-        if not os.path.isdir(person_path):
-            continue
+def recognize_face(img_path, df):
+    try:
+        embedding = DeepFace.represent(
+            img_path=img_path,
+            model_name=CONFIG['model_name'],
+            detector_backend=CONFIG['detector'],
+            enforce_detection=False
+        )[0]['embedding']
+        query = np.array(embedding)
 
-        for img_name in clean_directory_listing(person_path):
-            img_path = os.path.join(person_path, img_name)
+        df['similarity'] = df['embedding'].apply(
+            lambda x: np.dot(query, np.array(x)) /
+                      (np.linalg.norm(query) * np.linalg.norm(np.array(x)))
 
+        best_match = df.loc[df['similarity'].idxmax()]
+        return best_match
+    except Exception as e:
+        st.error(f"Recognition error: {str(e)}")
+        return None
+
+
+# Streamlit UI
+st.title("Face Recognition System")
+
+tab1, tab2 = st.tabs(["Recognize Faces", "Manage Database"])
+
+with tab1:
+    uploaded_file = st.file_uploader("Upload face image", type=["jpg", "png", "jpeg"])
+
+    if uploaded_file:
+        img = Image.open(uploaded_file)
+        st.image(img, caption="Uploaded Image", width=300)
+
+        if st.button("Recognize"):
+            df = load_database()
+            if not df.empty:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                    img.save(tmp.name)
+                    result = recognize_face(tmp.name, df)
+                    os.unlink(tmp.name)
+
+                    if result is not None:
+                        if result['similarity'] > CONFIG['threshold']:
+                            st.success(f"✅ Match: {result['name']} (Confidence: {result['similarity']:.2f})")
+                        else:
+                            st.warning(
+                                f"⚠️ Possible Match: {result['name']} (Low Confidence: {result['similarity']:.2f})")
+            else:
+                st.error("No faces in database! Add some faces first.")
+
+with tab2:
+    st.header("Add New Face")
+    new_name = st.text_input("Person's Name")
+    new_face = st.file_uploader("Upload face image", type=["jpg", "png", "jpeg"], key="enrollment")
+
+    if new_name and new_face:
+        if st.button("Add to Database"):
+            # Save to known_faces directory
+            person_dir = os.path.join(CONFIG['known_faces_dir'], new_name)
+            os.makedirs(person_dir, exist_ok=True)
+
+            img_path = os.path.join(person_dir, new_face.name)
+            Image.open(new_face).save(img_path)
+
+            # Update embeddings
             try:
                 embedding = DeepFace.represent(
                     img_path=img_path,
                     model_name=CONFIG['model_name'],
                     detector_backend=CONFIG['detector'],
-                    enforce_detection=True
+                    enforce_detection=False
                 )[0]['embedding']
 
-                data.append({
-                    "name": person_name,
-                    "embedding": np.array(embedding).tolist(),
-                    "image_path": img_path
-                })
-                st.success(f"✅ Processed: {person_name}/{img_name}")
+                df = load_database()
+                new_entry = pd.DataFrame([{
+                    "name": new_name,
+                    "embedding": embedding
+                }])
+                df = pd.concat([df, new_entry], ignore_index=True)
+                df.to_csv(CONFIG['database_path'], index=False)
 
+                st.success(f"✅ Added {new_name} to database!")
+                st.balloons()
             except Exception as e:
-                st.error(f"❌ Failed on {img_path}: {str(e)}")
+                st.error(f"Error: {str(e)}")
 
-    if data:
-        pd.DataFrame(data).to_csv(CONFIG['database_path'], index=False)
-        st.success(f"💾 Saved {len(data)} embeddings to {CONFIG['database_path']}")
+    st.header("Database Info")
+    df = load_database()
+    if not df.empty:
+        st.write(f"Total registered faces: {len(df)}")
+        st.dataframe(df[['name']])
     else:
-        st.error("❌ No valid faces found!")
-
-# Recognize Faces
-def recognize_faces():
-    try:
-        df = pd.read_csv(CONFIG['database_path'])
-        df['embedding'] = df['embedding'].apply(eval)
-    except Exception as e:
-        st.error(f"❌ Database error: {e}")
-        return
-
-    st.info("🔍 Starting recognition...")
-
-    for img_name in clean_directory_listing(CONFIG['unknown_faces_dir']):
-        img_path = os.path.join(CONFIG['unknown_faces_dir'], img_name)
-
-        try:
-            query_embedding = DeepFace.represent(
-                img_path=img_path,
-                model_name=CONFIG['model_name'],
-                detector_backend=CONFIG['detector'],
-                enforce_detection=True
-            )[0]['embedding']
-            query_embedding = np.array(query_embedding)
-
-            similarities = []
-            for _, row in df.iterrows():
-                known_embedding = np.array(row['embedding'])
-                similarity = np.dot(query_embedding, known_embedding) / (
-                    np.linalg.norm(query_embedding) * np.linalg.norm(known_embedding)
-                )
-                similarities.append(similarity)
-
-            best_match_idx = np.argmax(similarities)
-            best_similarity = similarities[best_match_idx]
-            match_name = df.iloc[best_match_idx]['name']
-
-            st.image(img_path, caption=f"Processing: {img_name}")
-            st.write(f"🔎 Best Match: {match_name}")
-            st.write(f"📏 Similarity: {best_similarity:.4f} (Threshold: {CONFIG['threshold']})")
-
-            for idx, similarity in enumerate(similarities):
-                st.write(f"ℹ️ {df.iloc[idx]['name']}: {similarity:.4f}")
-
-            if best_similarity > CONFIG['threshold']:
-                st.success(f"✅ VERIFIED: {match_name}")
-            else:
-                st.error("❌ UNKNOWN FACE")
-
-        except Exception as e:
-            st.error(f"⚠️ Error processing {img_name}: {str(e)}")
-
-# Streamlit UI
-st.title("⭐ Face Recognition System ⭐")
-
-if st.button("Extract Face Embeddings"):
-    extract_embeddings()
-
-if st.button("Recognize Faces"):
-    recognize_faces()
-
-st.info("📊 Summary")
-st.write("Known Faces:", os.listdir(CONFIG['known_faces_dir']))
-st.write("Tested Unknown Faces:", clean_directory_listing(CONFIG['unknown_faces_dir']))
+        st.warning("No faces in database")
