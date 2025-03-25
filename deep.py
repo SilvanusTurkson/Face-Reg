@@ -1,11 +1,20 @@
-# app.py
+import logging
 import streamlit as st
 import pandas as pd
 import numpy as np
-from deepface import DeepFace
 import os
-from PIL import Image
 import tempfile
+from PIL import Image
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+# Import DeepFace safely
+try:
+    from deepface import DeepFace
+except ImportError as e:
+    logging.error(f"DeepFace import failed: {e}")
+    st.error("DeepFace library not installed. Please install it using `pip install deepface`.")
 
 # Configuration - Use local files instead of Google Drive
 CONFIG = {
@@ -20,9 +29,10 @@ CONFIG = {
 def load_database():
     try:
         df = pd.read_csv(CONFIG['database_path'])
-        df['embedding'] = df['embedding'].apply(eval)
+        df['embedding'] = df['embedding'].apply(eval)  # Convert string back to list
         return df
-    except:
+    except Exception as e:
+        logging.warning(f"Failed to load database: {e}")
         return pd.DataFrame(columns=['name', 'embedding'])
 
 # Face recognition function
@@ -35,17 +45,22 @@ def recognize_face(image_path, df):
             detector_backend=CONFIG['detector'],
             enforce_detection=True
         )[0]['embedding']
-        
-        # Calculate similarities
+
+        # Convert to NumPy array for calculations
         query = np.array(embedding)
+
+        # Compute similarity with stored embeddings
         df['similarity'] = df['embedding'].apply(
-            lambda x: np.dot(query, np.array(x)) / 
+            lambda x: np.dot(query, np.array(x)) /
             (np.linalg.norm(query) * np.linalg.norm(np.array(x)))
-        
+        )
+
+        # Get best match
         best_match = df.loc[df['similarity'].idxmax()]
         return best_match
-    
+
     except Exception as e:
+        logging.error(f"Recognition error: {e}")
         st.error(f"Error: {str(e)}")
         return None
 
@@ -59,11 +74,11 @@ if uploaded_file is not None:
     # Display image
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", width=300)
-    
+
     # Recognize button
     if st.button("Recognize Face"):
         df = load_database()
-        
+
         if df.empty:
             st.warning("No faces in database! Please add faces first.")
         else:
@@ -72,26 +87,26 @@ if uploaded_file is not None:
                 image.save(tmp.name)
                 result = recognize_face(tmp.name, df)
                 os.unlink(tmp.name)
-            
+
             if result is not None:
                 st.subheader("Results")
                 col1, col2 = st.columns(2)
-                
+
                 with col1:
                     st.metric("Best Match", result['name'])
-                
+
                 with col2:
                     st.metric("Confidence", f"{result['similarity']:.2f}")
-                
+
                 # Show progress bar
                 st.progress(result['similarity'])
-                
+
                 # Verification result
                 if result['similarity'] > CONFIG['threshold']:
                     st.success("✅ Verified Match")
                 else:
                     st.warning("⚠️ Low Confidence Match")
-                
+
                 # Show all matches
                 with st.expander("Show all matches"):
                     for _, row in df.sort_values('similarity', ascending=False).iterrows():
