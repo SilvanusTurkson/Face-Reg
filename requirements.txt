@@ -3,6 +3,6 @@ deepface
 tensorflow
 keras
 numpy
-opencv-python-headless
 pandas
 Pillow
+opencv-python-headless
