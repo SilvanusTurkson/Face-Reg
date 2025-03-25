@@ -1,6 +1,11 @@
+# Core packages
 streamlit==1.32.0
-deepface==0.0.83
 numpy==1.26.4
 pandas==2.2.1
+
+# Face recognition
+deepface==0.0.83
 opencv-python-headless==4.9.0.80
+
+# Google Colab (for Google Drive support)
 google-colab
