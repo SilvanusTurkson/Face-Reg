@@ -1,40 +1,38 @@
+# app.py - Streamlit Interface for Face Recognition
+
 import streamlit as st
-import tempfile
-from PIL import Image
-import sys
-import os
-sys.path.append(os.path.dirname(__file__))  # Ensure current directory is in path
+from face_recognition import extract_embeddings, recognize_faces
 
-from face_recognition import extract_embeddings, recognize_face
-
+# Streamlit Page Configuration
+st.set_page_config(page_title="Face Recognition System", layout="wide")
 
 # Title
-st.title("🔍 Face Recognition System")
+st.title("⭐ Face Recognition System")
 
-# Extract Embeddings Button
-if st.button("📊 Extract Face Embeddings"):
-    extract_embeddings()
-    st.success("✅ Face embeddings extracted successfully!")
+# Menu
+menu = st.sidebar.radio("Select Option", ["Extract Embeddings", "Recognize Faces"])
 
-# Upload Image
-uploaded_file = st.file_uploader("📤 Upload an image for recognition", type=["png", "jpg", "jpeg"])
+# Display Instructions
+st.sidebar.markdown("### Instructions:")
+st.sidebar.markdown("""
+1. Ensure known faces are in the `known_faces` directory.
+2. Place unknown faces in the `unknown_faces` directory.
+3. Choose an option to run.
+""")
 
-if uploaded_file:
-    # Display uploaded image
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+# Run Extract Embeddings
+if menu == "Extract Embeddings":
+    if st.button("Extract Face Embeddings"):
+        st.info("Processing images from the `known_faces` directory...")
+        extract_embeddings()
+        st.success("✅ Embeddings extracted successfully!")
 
-    # Save image temporarily
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        image.save(tmp.name)
-        image_path = tmp.name
+# Run Recognize Faces
+elif menu == "Recognize Faces":
+    if st.button("Recognize Faces"):
+        st.info("Recognizing faces from the `unknown_faces` directory...")
+        recognize_faces()
+        st.success("✅ Face recognition completed!")
 
-    # Recognize Face
-    if st.button("🔎 Recognize Face"):
-        match_name, confidence = recognize_face(image_path)
-
-        if match_name:
-            st.success(f"✅ Match Found: {match_name}")
-            st.write(f"🔢 Confidence: {confidence:.4f}")
-        else:
-            st.error("❌ No face detected or database error.")
+# Footer
+st.sidebar.markdown("Developed with ❤️ using DeepFace and Streamlit")
