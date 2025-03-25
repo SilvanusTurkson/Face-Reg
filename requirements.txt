@@ -1,9 +1,6 @@
 streamlit
 deepface
-opencv-python-headless
-tensorflow-cpu
-pillow
-numpy
 pandas
-gdown
-h5py
+numpy
+opencv-python-headless
+google-colab  # If you rely on Google Drive mounting
