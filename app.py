@@ -1,7 +1,12 @@
 import streamlit as st
 import tempfile
 from PIL import Image
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))  # Ensure current directory is in path
+
 from face_recognition import extract_embeddings, recognize_face
+
 
 # Title
 st.title("🔍 Face Recognition System")
